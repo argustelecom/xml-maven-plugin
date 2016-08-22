@@ -24,7 +24,7 @@ import java.io.File;
 /**
  * An instance of this class is used to specify a set of files, which are validated against a common schema.
  */
-public class ValidationSet
+public class ValidationSet implements Cloneable
 {
     private String publicId;
 
@@ -33,6 +33,8 @@ public class ValidationSet
     private String schemaLanguage;
 
     private boolean validating;
+    
+    private boolean autodetect;
 
     private File dir;
 
@@ -50,7 +52,12 @@ public class ValidationSet
         return this.dir;
     }
 
-    /**
+    @Override
+	public Object clone() throws CloneNotSupportedException {
+		return super.clone();
+	}
+
+	/**
      * Returns patterns of files, which are being excluded from the validation set.
      */
     public String[] getExcludes()
@@ -112,6 +119,14 @@ public class ValidationSet
         return validating;
     }
 
+    /**
+     * If systemId is empty and this flag is true - plugin will read all necessary data from file, prepared for validation.
+     */
+    public boolean isAutodetect()
+    {
+        return autodetect;
+    }
+    
     /**
      * Sets a directory, which is scanned for files to validate.
      */
@@ -180,5 +195,13 @@ public class ValidationSet
     public void setValidating( boolean pValidating )
     {
         validating = pValidating;
+    }
+    
+    /**
+     * Set autodetect mode.
+     */
+    public void setAutodetect( boolean pAutodetect )
+    {
+    	autodetect = pAutodetect;
     }
 }

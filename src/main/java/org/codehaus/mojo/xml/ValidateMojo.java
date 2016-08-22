@@ -21,6 +21,7 @@ package org.codehaus.mojo.xml;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
@@ -36,6 +37,10 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.codehaus.mojo.xml.autodetect.DTDdetector;
+import org.codehaus.mojo.xml.autodetect.NameSpaceDetector;
+import org.codehaus.mojo.xml.autodetect.XSDdetector;
+import org.codehaus.mojo.xml.autodetect.XmlUrlReader;
 import org.codehaus.mojo.xml.validation.ValidationSet;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
@@ -134,15 +139,59 @@ public class ValidateMojo
     {
         try
         {
-            if ( pSchema == null )
+            if ( pSchema == null && pValidationSet.isAutodetect()==false )
             {
-                getLog().debug( "Parsing " + pFile.getPath() );
+                getLog().debug( "-> Parsing " + pFile.getPath() );
                 parse( pResolver, pValidationSet, pFile );
             }
             else
             {
-                getLog().debug( "Validating " + pFile.getPath() );
-                Validator validator = pSchema.newValidator();
+                getLog().debug( "-> Validating " + pFile.getPath() );
+                //Clone validatingSet for safety modify
+                ValidationSet currentSet = null;
+            	try {
+        			currentSet = (ValidationSet) pValidationSet.clone();
+        		} catch (CloneNotSupportedException e) {
+        			throw new IllegalStateException("Can't get ValidationSet for work.");
+        		}
+                
+                Validator validator = null;
+                if (pSchema != null){
+                	validator = pSchema.newValidator();
+                }else{
+                	//Get data from file to current Validation Set
+                	XmlUrlReader reader = new XmlUrlReader( pFile.toURI().toURL(), getLog() );
+                    NameSpaceDetector xmlNameSpace = new NameSpaceDetector();
+                    reader.addDetector( xmlNameSpace );
+                    reader.addDetector( new DTDdetector(currentSet) );
+                    reader.addDetector( new XSDdetector(currentSet) );
+                    reader.read();
+                    //If we have DTD schema file - validate as DTD
+                	if ( currentSet.getSystemId() != null && currentSet.getSystemId().contains(".dtd")){
+                		doDTDvalidation( pFile );
+                        return;
+                	}
+                	if (currentSet.getSystemId()==null){
+                		getLog().warn("Can't find schema systemId. Skipped.");
+                		return;
+                	}
+                	
+                	//Try to compare nameSpace from document and schema (info can help for understanding of error
+                	if (currentSet.getSystemId()!=null){
+                		NameSpaceDetector schemaNameSpace = new NameSpaceDetector();
+                		reader = new XmlUrlReader( new URL(currentSet.getSystemId()), getLog() );
+                    	reader.addDetector( schemaNameSpace );
+                    	reader.read();
+                    	if ( !schemaNameSpace.getNameSpace().equals( xmlNameSpace.getNameSpace() )){
+                    		getLog().warn("WARNING!!! NameSpace from document differ from NameSpace in schema file!");
+                    	}
+                	}
+                }
+                if (validator == null) return;
+                if (currentSet.getSystemId()==null){
+                	getLog().error("!!!");
+                }
+                
                 if ( pResolver != null )
                 {
                     validator.setResourceResolver( pResolver );
@@ -267,19 +316,22 @@ public class ValidateMojo
         }
         xr.setErrorHandler( new ErrorHandler()
         {
-            public void error( SAXParseException pException )
+            @Override
+			public void error( SAXParseException pException )
                 throws SAXException
             {
                 throw pException;
             }
 
-            public void fatalError( SAXParseException pException )
+            @Override
+			public void fatalError( SAXParseException pException )
                 throws SAXException
             {
                 throw pException;
             }
 
-            public void warning( SAXParseException pException )
+            @Override
+			public void warning( SAXParseException pException )
                 throws SAXException
             {
                 throw pException;
@@ -321,7 +373,8 @@ public class ValidateMojo
      * @throws MojoExecutionException Running the Mojo failed.
      * @throws MojoFailureException A configuration error was detected.
      */
-    public void execute()
+    @Override
+	public void execute()
         throws MojoExecutionException, MojoFailureException
     {
         if ( isSkipping() )
@@ -351,4 +404,54 @@ public class ValidateMojo
             passivateProxy( oldProxySettings );
         }
     }
+    
+	/**
+	 * Perform <a href=http://www.w3schools.com/xml/xml_dtd.asp>DTD</a> validation for XML document.<br>
+	 * An example: <a href=https://docs.oracle.com/javase/tutorial/jaxp/sax/validation.html>Validation example</a>
+	 * 
+	 * @param file
+	 *            XML document for validation.
+	 */
+	public void doDTDvalidation(File file) {
+		getLog().debug("Process DTD validation...");
+
+		SAXParserFactory factory = SAXParserFactory.newInstance();
+		factory.setNamespaceAware(true);
+		factory.setValidating(true);
+
+		XMLReader reader;
+		try {
+			reader = factory.newSAXParser().getXMLReader();
+		} catch (SAXException e) {
+			throw new IllegalStateException("Can't get reader for xml file");
+		} catch (ParserConfigurationException e) {
+			throw new IllegalStateException("File parsing error");
+		}
+
+		reader.setErrorHandler(new ErrorHandler() {
+			@Override
+			public void warning(SAXParseException exception) throws SAXException {
+				getLog().warn(exception);
+			}
+
+			@Override
+			public void error(SAXParseException exception) throws SAXException {
+				throw new IllegalStateException("Validation failed:" + exception.getMessage());
+			}
+
+			@Override
+			public void fatalError(SAXParseException exception) throws SAXException {
+				throw new IllegalStateException("Validation failed:" + exception.getMessage());
+			}
+
+		});
+
+		try {
+			reader.parse(new InputSource(file.getAbsolutePath()));
+		} catch (IOException e) {
+			throw new IllegalStateException("I/O error: ", e);
+		} catch (SAXException e) {
+			throw new IllegalStateException(e);
+		}
+	}	
 }
