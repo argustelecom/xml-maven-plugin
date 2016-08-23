@@ -172,7 +172,7 @@ public class ValidateMojo
                         return;
                 	}
                 	if (currentSet.getSystemId()==null){
-                		getLog().warn("Can't find schema systemId. Skipped.");
+                		//getLog().warn("Can't find schema systemId. Skipped.");
                 		return;
                 	}
                 	
@@ -183,13 +183,13 @@ public class ValidateMojo
                     	reader.addDetector( schemaNameSpace );
                     	reader.read();
                     	if ( !schemaNameSpace.getNameSpace().equals( xmlNameSpace.getNameSpace() )){
-                    		getLog().warn("WARNING!!! NameSpace from document differ from NameSpace in schema file!");
+                    		getLog().warn("WARNING!!! NameSpace in schema file differ from NameSpace in file" + pFile.getAbsolutePath());
                     	}
                 	}
+                	validator = getSchema(pResolver, currentSet).newValidator();
                 }
-                if (validator == null) return;
-                if (currentSet.getSystemId()==null){
-                	getLog().error("!!!");
+                if (validator == null){
+                	return;
                 }
                 
                 if ( pResolver != null )
