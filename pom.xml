@@ -8,7 +8,7 @@
   <artifactId>xml-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
   <name>XML Maven Plugin</name>
-  <version>1.0.2-SNAPSHOT</version>
+  <version>1.0.2.argus</version>
   <url>http://www.mojohaus.org/xml-maven-plugin/</url>
   <prerequisites>
     <maven>${mavenVersion}</maven>
