@@ -164,7 +164,7 @@ public abstract class AbstractXmlMojo
         final File dir = asAbsoluteFile( pDir );
         if ( !dir.isDirectory() )
         {
-            getLog().warn( "The directory " + dir.getPath()
+            getLog().debug( "The directory " + dir.getPath()
                 + ", which is a base directory of a ValidationSet or TransformationSet, does not exist." );
             return new String[0];
         }

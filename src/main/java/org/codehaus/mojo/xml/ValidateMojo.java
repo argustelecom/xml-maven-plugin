@@ -21,7 +21,9 @@ package org.codehaus.mojo.xml;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.NoSuchElementException;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
@@ -165,7 +167,11 @@ public class ValidateMojo
                     reader.addDetector( xmlNameSpace );
                     reader.addDetector( new DTDdetector(currentSet) );
                     reader.addDetector( new XSDdetector(currentSet) );
-                    reader.read();
+                    try{
+                    	reader.read();
+                    }catch(NoSuchElementException e){
+                    	getLog().warn("Empty file: " + pFile.getAbsolutePath());
+                    }
                     //If we have DTD schema file - validate as DTD
                 	if ( currentSet.getSystemId() != null && currentSet.getSystemId().contains(".dtd")){
                 		doDTDvalidation( pFile );
@@ -177,16 +183,22 @@ public class ValidateMojo
                 	}
                 	
                 	//Try to compare nameSpace from document and schema (info can help for understanding of error
-                	if (currentSet.getSystemId()!=null){
-                		NameSpaceDetector schemaNameSpace = new NameSpaceDetector();
-                		reader = new XmlUrlReader( new URL(currentSet.getSystemId()), getLog() );
-                    	reader.addDetector( schemaNameSpace );
-                    	reader.read();
-                    	if ( !schemaNameSpace.getNameSpace().equals( xmlNameSpace.getNameSpace() )){
-                    		getLog().warn("WARNING!!! NameSpace in schema file differ from NameSpace in file" + pFile.getAbsolutePath());
-                    	}
+                	try{
+                		if (currentSet.getSystemId()!=null){
+                			NameSpaceDetector schemaNameSpace = new NameSpaceDetector();
+                			reader = new XmlUrlReader( new URL(currentSet.getSystemId()), getLog() );
+                			reader.addDetector( schemaNameSpace );
+                			reader.read();
+                			if ( !schemaNameSpace.getNameSpace().equals( xmlNameSpace.getNameSpace() )){
+                				getLog().error("WARNING!!! NameSpace in schema file differ from NameSpace in file" + pFile.getAbsolutePath());
+                			}
+                		}
+                    	validator = getSchema(pResolver, currentSet).newValidator();
+                	}catch(MalformedURLException e){
+                		getLog().warn( e.getMessage() + " in "+ pFile.getAbsolutePath() );
+                	}catch(IllegalStateException e){
+                		getLog().warn( e.getMessage() + " in "+ pFile.getAbsolutePath() );
                 	}
-                	validator = getSchema(pResolver, currentSet).newValidator();
                 }
                 if (validator == null){
                 	return;

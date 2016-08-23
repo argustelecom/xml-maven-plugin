@@ -39,7 +39,7 @@ public class XSDdetector implements XMLEventDetector {
 				// Skip namespace part in schema path
 				int pos = 0;
 				if (attr.getValue() != null)
-					pos = attr.getValue().indexOf(" ");
+					pos = attr.getValue().lastIndexOf(" ");
 				if (pos > 0) {
 					params.setSystemId(attr.getValue().substring(pos + 1));
 				} else {
